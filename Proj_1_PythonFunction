@@ -1,12 +1,18 @@
-in [year] how many
-[people/males/females] aged [low] to
-[high] were living in [the
-world/region/country]?
+#Configuring Environemnt
 
-#assuming population is a dataset that has these datapoints 
-def current_pop(year, pop_type, low_bound, upper_bound, region):
-    pop_filtered = population[pop_type].where('year' == year).where('id' = region).columns('age', 'quantity')
-    sum(pop_filtered.where(upper_bound >='age' >= low_bound).column('quantity')
+import wbdata
+import cufflinks as cf #for plotting 
+pop_source = 40 #the id number of population data
+wbdata.get_indicator(source=pop_source) #shows what indicators we could use
+
+
+#[#A] Population Statistics 
+#return a quantity of people with the given filters
+def current_pop(year='2020', pop_type='Women', lower_bound='0', upper_bound='100', region='WLD'):
     
-
+   #this has to be at the end. filter for age first pop_data = wbdata.get_dataframe({SP.POP.TOTL":"World Population"}, country=region)
+    pop_filtered = population[pop_type].where('year' == year).where('id' = region).columns('age', 'quantity')
+    sum(pop_filtered.where(upper_bound >='age' >= low_bound).column('quantity'))
+    
+# given unit test
 assert population(year=2000,sex='Male',age_range=(0,100),place='WLD') > 7e9/2
