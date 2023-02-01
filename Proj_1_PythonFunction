@@ -32,7 +32,6 @@ ESG_data = 75
 
 
 #[#A] Population Statistics 
-#return a quantity of people with the given filters
 def population(year, sex, age, country):
 #Function population takes in "year" as an integer; 
 #"sex" as a string, female for "FE", male for "MA", all for "TOTAL"
@@ -52,44 +51,43 @@ def population(year, sex, age, country):
         id = "SP.POP." + str(low_age) + str(high_age)+ "." + sex
         pop = wbdata.get_dataframe({id:"pop"}, country).loc[str(year)]["pop"]
         return pop
-    
+      
 #Example: in year 2010, return the number of females aged 15-19 living in sub-saharan Africa
 population(2010,"FE",[15,19],"SSF")
 
-pop_id_df = pd.DataFrame(wbdata.get_indicator(source = pop_source))
 
+pop_id_df = pd.DataFrame(wbdata.get_indicator(source = pop_source))
 ids_dic = wbdata.get_indicator(source = pop_source)[33:119]
 ids = []
 for dic in ids_dic:
     ids += [dic["id"]]
-    age_sex_groups = list(filter(lambda x: len(x) ==14 and x[13] != "O", ids))
-age_sex_groups
+age_sex_groups_female = list(filter(lambda x: len(x) ==14 and x[13] == "E", ids))
+age_sex_groups_male = list(filter(lambda x: len(x) ==14 and x[13] == "A", ids))
+age_sex_groups = age_sex_groups_male + age_sex_groups_female
+
 
 #Helper function : convert ids to readable names
 def id_to_column_name(id):
     age = id[7:11]
-    sex = id[13:]
-    col_name = ""
+    sex = id[12:]
     if sex == "MA":
-        col_name = "female " + str(age[0:2]) + "-" + str(age[2:])
-        return col_name
+        col_name = "male " + str(age[0:2]) + "-" + str(age[2:])
     else: 
-        col_name = "male " + str(age[0:2]) + " - " + str(age[2:])
-        return col_name
+        col_name = "female " + str(age[0:2]) + " - " + str(age[2:])
+    return col_name
 id_to_column_name('SP.POP.80UP.MA')
 
 
 #A Population DataFrames 
 def pop_df():
     pop_df = wbdata.get_dataframe({age_sex_groups[0]:id_to_column_name(age_sex_groups[0])})
-    for id in age_sex_groups:
+    for id in age_sex_groups[1:]:
         new_df = wbdata.get_dataframe({id:id_to_column_name(id)})
         pop_df = pd.concat([pop_df,new_df], axis =1)
     return pop_df
 #example the age-sex groups population counts per year in USA
 world_pop_df = pop_df()
 world_pop_df.head()
-
 
 SSA_pop = world_pop_df.loc['Sub-Saharan Africa (excluding high income)']
 SSA_pop
@@ -100,19 +98,23 @@ SSA_pop
 test = wbdata.get_dataframe(variables,country="SSA")
 
 #B Population Pyramid
+
+#takes in table of a population (of a region) distributed by age group 
+#this is after it has been passed through #A
+
 def plot_pyramid(df):
     layout = go.Layout(barmode='overlay',
                        yaxis=go.layout.YAxis(range=[0, 90], title='Age'),
                        xaxis=go.layout.XAxis(title='Number'))
     years = range(2020,1960,-20)
-    bins = [go.Bar(x = df.loc[str(year),:].filter(regex="Male").values,
+    bins = [go.Bar(x = df.loc[str(year),:].filter(regex="male").values,
                    y = [int(s[:2])+1 for s in age_ranges],
                    orientation='h',
                    name='Men{:d}'.format(year),
                    hoverinfo='skip'
                    )
             for year in years]
-    bins += [go.Bar(x = -df.loc[str(year),:].filter(regex="Female").values,
+    bins += [go.Bar(x = -df.loc[str(year),:].filter(regex="female").values,
                 y=[int(s[:2])+1 for s in age_ranges],
                 orientation='h',
                 name='Women {:d}'.format(year),
@@ -121,7 +123,6 @@ def plot_pyramid(df):
              for year in years]
     py.iplot(dict(data=bins, layout=layout))
 
-
-plot_pyramid(test)
+plot_pyramid(SSA_pop)
     
     
