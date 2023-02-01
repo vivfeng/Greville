@@ -1,18 +1,127 @@
 #Configuring Environemnt
 
+!pip install wbdata
 import wbdata
-import cufflinks as cf #for plotting 
-pop_source = 40 #the id number of population data
-wbdata.get_indicator(source=pop_source) #shows what indicators we could use
+import plotly.offline as py
+import plotly.graph_objs as go
+import pandas as pd
+import numpy as np
+!pip install cufflinks
+import cufflinks as cf
+cf.go_offline()
+
+py.init_notebook_mode(connected=True)
+
+
+#Separating the data
+age_ranges = []
+for i in range(0,80,5):
+    age_ranges.append(f"{i:02d}"+f"{i+4:02d}") #What is this 
+
+age_ranges.append("80UP")
+
+male_vars = {"SP.POP."+age_range+".MA":"Males "+age_range for age_range in age_ranges}
+female_vars = {"SP.POP."+age_range+".FE":"Females "+age_range for age_range in age_ranges}
+
+vars = male_vars
+vars.update(female_vars)
+
+wbdata.get_source()
+pop_source = 40
+ESG_data = 75
 
 
 #[#A] Population Statistics 
 #return a quantity of people with the given filters
-def current_pop(year='2020', pop_type='Women', lower_bound='0', upper_bound='100', region='WLD'):
+def population(year, sex, age, country):
+#Function population takes in "year" as an integer; 
+#"sex" as a string, female for "FE", male for "MA", all for "TOTAL"
+#"age" as a list [lower_range, higher_range]
+# due to limitation of the dataset, there is only a limited number of age ranges accepted 
+# including : [00,04],[00,14],[05,09],[10,14],[15,19],[15,64],[20-24],[25,29],[30,34],[35,39] ... [75,79],[80,UP]
+# "country" as a string of id of the country, for example, "SSF" for Sub-Saharan Africa
+    low_age = age[0]
+    high_age = age[1]
+    if sex == "TOTAL":
+        id_1 = "SP.POP." + str(low_age) + str(high_age)+ ".FE"
+        id_2 = "SP.POP." + str(low_age) + str(high_age)+ ".MA"
+        pop_female = wbdata.get_dataframe({id_1:"female_pop"}, country).loc[str(year)]["female_pop"]
+        pop_male = wbdata.get_dataframe({id_2:"male_pop"}, country).loc[str(year)]["male_pop"]
+        return pop_female + pop_male
+    else: 
+        id = "SP.POP." + str(low_age) + str(high_age)+ "." + sex
+        pop = wbdata.get_dataframe({id:"pop"}, country).loc[str(year)]["pop"]
+        return pop
     
-   #this has to be at the end. filter for age first pop_data = wbdata.get_dataframe({SP.POP.TOTL":"World Population"}, country=region)
-    pop_filtered = population[pop_type].where('year' == year).where('id' = region).columns('age', 'quantity')
-    sum(pop_filtered.where(upper_bound >='age' >= low_bound).column('quantity'))
+#Example: in year 2010, return the number of females aged 15-19 living in sub-saharan Africa
+population(2010,"FE",[15,19],"SSF")
+
+pop_id_df = pd.DataFrame(wbdata.get_indicator(source = pop_source))
+
+ids_dic = wbdata.get_indicator(source = pop_source)[33:119]
+ids = []
+for dic in ids_dic:
+    ids += [dic["id"]]
+    age_sex_groups = list(filter(lambda x: len(x) ==14 and x[13] != "O", ids))
+age_sex_groups
+
+#Helper function : convert ids to readable names
+def id_to_column_name(id):
+    age = id[7:11]
+    sex = id[13:]
+    col_name = ""
+    if sex == "MA":
+        col_name = "female " + str(age[0:2]) + "-" + str(age[2:])
+        return col_name
+    else: 
+        col_name = "male " + str(age[0:2]) + " - " + str(age[2:])
+        return col_name
+id_to_column_name('SP.POP.80UP.MA')
+
+
+#A Population DataFrames 
+def pop_df():
+    pop_df = wbdata.get_dataframe({age_sex_groups[0]:id_to_column_name(age_sex_groups[0])})
+    for id in age_sex_groups:
+        new_df = wbdata.get_dataframe({id:id_to_column_name(id)})
+        pop_df = pd.concat([pop_df,new_df], axis =1)
+    return pop_df
+#example the age-sex groups population counts per year in USA
+world_pop_df = pop_df()
+world_pop_df.head()
+
+
+SSA_pop = world_pop_df.loc['Sub-Saharan Africa (excluding high income)']
+SSA_pop
+
+
+#takes in table of a population (of a region) distributed by age group 
+#this is after it has been passed through #A
+test = wbdata.get_dataframe(variables,country="SSA")
+
+#B Population Pyramid
+def plot_pyramid(df):
+    layout = go.Layout(barmode='overlay',
+                       yaxis=go.layout.YAxis(range=[0, 90], title='Age'),
+                       xaxis=go.layout.XAxis(title='Number'))
+    years = range(2020,1960,-20)
+    bins = [go.Bar(x = df.loc[str(year),:].filter(regex="Male").values,
+                   y = [int(s[:2])+1 for s in age_ranges],
+                   orientation='h',
+                   name='Men{:d}'.format(year),
+                   hoverinfo='skip'
+                   )
+            for year in years]
+    bins += [go.Bar(x = -df.loc[str(year),:].filter(regex="Female").values,
+                y=[int(s[:2])+1 for s in age_ranges],
+                orientation='h',
+                name='Women {:d}'.format(year),
+                hoverinfo='skip',
+               )
+             for year in years]
+    py.iplot(dict(data=bins, layout=layout))
+
+
+plot_pyramid(test)
     
-# given unit test
-assert population(year=2000,sex='Male',age_range=(0,100),place='WLD') > 7e9/2
+    
