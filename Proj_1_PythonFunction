@@ -1,5 +1,4 @@
 #Configuring Environemnt
-
 !pip install wbdata
 import wbdata
 import plotly.offline as py
@@ -9,11 +8,10 @@ import numpy as np
 !pip install cufflinks
 import cufflinks as cf
 cf.go_offline()
-
 py.init_notebook_mode(connected=True)
 
 
-#Separating the data
+#Cleaning the data
 age_ranges = []
 for i in range(0,80,5):
     age_ranges.append(f"{i:02d}"+f"{i+4:02d}") #What is this 
@@ -52,7 +50,7 @@ def population(year, sex, age, country):
         pop = wbdata.get_dataframe({id:"pop"}, country).loc[str(year)]["pop"]
         return pop
       
-#Example: in year 2010, return the number of females aged 15-19 living in sub-saharan Africa
+#Example Test: in year 2010, return the number of females aged 15-19 living in sub-saharan Africa
 population(2010,"FE",[15,19],"SSF")
 
 
@@ -66,7 +64,7 @@ age_sex_groups_male = list(filter(lambda x: len(x) ==14 and x[13] == "A", ids))
 age_sex_groups = age_sex_groups_male + age_sex_groups_female
 
 
-#Helper function : convert ids to readable names
+#Helper Function that converts IDs to Readable Names
 def id_to_column_name(id):
     age = id[7:11]
     sex = id[12:]
@@ -78,7 +76,7 @@ def id_to_column_name(id):
 id_to_column_name('SP.POP.80UP.MA')
 
 
-#A Population DataFrames 
+#[#A] Population DataFrames 
 def pop_df():
     pop_df = wbdata.get_dataframe({age_sex_groups[0]:id_to_column_name(age_sex_groups[0])})
     for id in age_sex_groups[1:]:
@@ -97,7 +95,7 @@ SSA_pop
 #this is after it has been passed through #A
 test = wbdata.get_dataframe(variables,country="SSA")
 
-#B Population Pyramid
+#[#B] Population Pyramid
 
 #takes in table of a population (of a region) distributed by age group 
 #this is after it has been passed through #A
@@ -122,7 +120,20 @@ def plot_pyramid(df):
                )
              for year in years]
     py.iplot(dict(data=bins, layout=layout))
-
 plot_pyramid(SSA_pop)
     
     
+#[#C] Line Plot of Fertility Growth over Time in Sub-Saharan Africa vs. Low & Middle Income Populations 
+    Fert_Var = {"SP.DYN.TFRT.IN": "Fertility Rate"}
+    countries = {"SSA":"Sub-Saharan Africa (excluding high income)",
+                 "LMY":"Low & middle income"}
+    SSA_Fert = wbdata.get_dataframe(Fert_Var, country=countries).squeeze()
+    SSA_Fert = SSA_Fert.unstack('country')
+    SSA_Fert.iplot(title="Fertility Rates over Time",xTitle='Year',yTitle='Population')
+    
+#[#C] Line Plot of Population Growth over Time in Sub-Saharan Africa vs. Low & Middle Income Populations 
+    Pop_Var = {"SP.POP.GROW":"Population growth (annual %)"}
+    SSA_Pop = wbdata.get_dataframe(Pop_Var, country=countries).squeeze()
+    SSA_Pop = SSA_Pop.unstack('country')
+    SSA_Pop.iplot(title="Population over Time",xTitle='Year',yTitle='Population')
+
