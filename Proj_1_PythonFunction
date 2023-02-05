@@ -1,4 +1,5 @@
 #Configuring Environemnt
+
 !pip install wbdata
 import wbdata
 import plotly.offline as py
@@ -11,7 +12,9 @@ cf.go_offline()
 py.init_notebook_mode(connected=True)
 
 
-#Cleaning the data
+#Preparing and Cleaning the Data
+
+#creating our own lists for age groups separated by gender
 age_ranges = []
 for i in range(0,80,5):
     age_ranges.append(f"{i:02d}"+f"{i+4:02d}") #What is this 
@@ -24,19 +27,25 @@ female_vars = {"SP.POP."+age_range+".FE":"Females "+age_range for age_range in a
 vars = male_vars
 vars.update(female_vars)
 
+#These are the two indicators that we are using for our project within World Bank Data
 wbdata.get_source()
 pop_source = 40
 ESG_data = 75
 
 
+
+
+
 #[#A] Population Statistics 
+    #creating a function that takes in
+    #"year" as an integer; 
+    #"sex" as a string, female for "FE", male for "MA", all for "TOTAL"
+    #"age" as a list [lower_range, higher_range]
+        # due to limitation of the dataset, there is only a limited number of age ranges accepted 
+        # including : [00,04],[00,14],[05,09],[10,14],[15,19],[15,64],[20-24],[25,29],[30,34],[35,39] ... [75,79],[80,UP]
+    # "country" as a string of id of the country, for example, "SSF" for Sub-Saharan Africa
+
 def population(year, sex, age, country):
-#Function population takes in "year" as an integer; 
-#"sex" as a string, female for "FE", male for "MA", all for "TOTAL"
-#"age" as a list [lower_range, higher_range]
-# due to limitation of the dataset, there is only a limited number of age ranges accepted 
-# including : [00,04],[00,14],[05,09],[10,14],[15,19],[15,64],[20-24],[25,29],[30,34],[35,39] ... [75,79],[80,UP]
-# "country" as a string of id of the country, for example, "SSF" for Sub-Saharan Africa
     low_age = age[0]
     high_age = age[1]
     if sex == "TOTAL":
@@ -50,10 +59,11 @@ def population(year, sex, age, country):
         pop = wbdata.get_dataframe({id:"pop"}, country).loc[str(year)]["pop"]
         return pop
       
-#Example Test: in year 2010, return the number of females aged 15-19 living in sub-saharan Africa
+#Test Case: in year 2010, return the number of females aged 15-19 living in Sub-Saharan Africa
 population(2010,"FE",[15,19],"SSF")
 
 
+#Creating list of population IDs sorted by age and gender 
 pop_id_df = pd.DataFrame(wbdata.get_indicator(source = pop_source))
 ids_dic = wbdata.get_indicator(source = pop_source)[33:119]
 ids = []
@@ -73,10 +83,12 @@ def id_to_column_name(id):
     else: 
         col_name = "female " + str(age[0:2]) + " - " + str(age[2:])
     return col_name
-id_to_column_name('SP.POP.80UP.MA')
+#Test to get the name of the column given the id: id_to_column_name('SP.POP.80UP.MA')
+
 
 
 #[#A] Population DataFrames 
+    #sorts all countries' population into a table by gender, age range, and year
 def pop_df():
     pop_df = wbdata.get_dataframe({age_sex_groups[0]:id_to_column_name(age_sex_groups[0])})
     for id in age_sex_groups[1:]:
@@ -87,18 +99,13 @@ def pop_df():
 world_pop_df = pop_df()
 world_pop_df.head()
 
+#to get Sub-Saharan Africa's population table
 SSA_pop = world_pop_df.loc['Sub-Saharan Africa (excluding high income)']
 SSA_pop
 
 
-#takes in table of a population (of a region) distributed by age group 
-#this is after it has been passed through #A
-test = wbdata.get_dataframe(variables,country="SSA")
-
 #[#B] Population Pyramid
-
-#takes in table of a population (of a region) distributed by age group 
-#this is after it has been passed through #A
+    #Function that takes a population distributed by age group as a DataFrame and returns a population pyramid
 
 def plot_pyramid(df):
     layout = go.Layout(barmode='overlay',
@@ -120,6 +127,8 @@ def plot_pyramid(df):
                )
              for year in years]
     py.iplot(dict(data=bins, layout=layout))
+
+#Plotting the Sub-Saharan Africa Population as a population pyramid 
 plot_pyramid(SSA_pop)
     
     
@@ -130,6 +139,7 @@ plot_pyramid(SSA_pop)
     SSA_Fert = wbdata.get_dataframe(Fert_Var, country=countries).squeeze()
     SSA_Fert = SSA_Fert.unstack('country')
     SSA_Fert.iplot(title="Fertility Rates over Time",xTitle='Year',yTitle='Population')
+    
     
 #[#C] Line Plot of Population Growth over Time in Sub-Saharan Africa vs. Low & Middle Income Populations 
     Pop_Var = {"SP.POP.GROW":"Population growth (annual %)"}
